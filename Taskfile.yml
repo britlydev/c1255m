@@ -1,6 +1,8 @@
 # Taskfile
 version: '3'
 
+dotenv: ['.env']
+
 vars:
   LOCAL_BIN: './bin'
   GOLANGCI_VERSION: latest
@@ -44,4 +46,12 @@ tasks:
     cmds:
       - CGO_ENABLED=0 go build -o {{.LOCAL_BIN}}/api{{exeExt}} ./cmd/api
 
+  # openapi
+  get-openapi:
+    cmds:
+      - go get -tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
+      - go get github.com/oapi-codegen/runtime@latest
 
+  generate:openapi:
+    cmds:
+      - go generate ./internal/transport/httpapi/oapi/...

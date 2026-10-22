@@ -1,0 +1,28 @@
+openapi: 3.0.3
+info:
+  title: Math API
+  version: 1.0.0
+paths:
+  /api/v1/healthcheck:
+    get:
+      operationId: healthcheck
+      summary: Service health
+      responses:
+        "200":
+          description: Service is available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthcheckResponse"
+components:
+  schemas:
+    HealthcheckResponse:
+      type: object
+      required: [status, environment]
+      properties:
+        status:
+          type: string
+          example: available
+        environment:
+          type: string
+          example: development

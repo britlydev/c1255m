@@ -1,10 +1,16 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
+	"github.com/britlydev/c210cc/internal/app"
 	"github.com/britlydev/c210cc/internal/config"
 )
 
@@ -17,6 +23,9 @@ func main() {
 }
 
 func run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
 	configPath := os.Getenv("C1255M_CONFIG_PATH")
 	if configPath == "" {
 		configPath = "configs/config.yaml"
@@ -29,7 +38,21 @@ func run() error {
 		return err
 	}
 
-	_ = cfg
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- app.RunAPI(ctx, cfg)
+	}()
 
-	return nil
+	select {
+	case err := <-errCh:
+		return err
+	case <-ctx.Done():
+	}
+
+	select {
+	case err := <-errCh:
+		return err
+	case <-time.After(30 * time.Second):
+		return errors.New("graceful shutdown time out")
+	}
 }

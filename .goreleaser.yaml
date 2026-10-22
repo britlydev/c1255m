@@ -21,3 +21,7 @@ archives:
 
 changelog:
   use: github
+  format: "{{ .SHA }}: {{ .Message }} (@{{ .AuthorUsername }})"
+  filters:
+    exclude:
+      - '^Merge pull request'

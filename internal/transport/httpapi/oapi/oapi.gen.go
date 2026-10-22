@@ -15,7 +15,42 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gofiber/fiber/v3"
+	"github.com/oapi-codegen/runtime"
 )
+
+// Defines values for CalculateParamsOp.
+const (
+	Add CalculateParamsOp = "add"
+	Div CalculateParamsOp = "div"
+	Mul CalculateParamsOp = "mul"
+	Sub CalculateParamsOp = "sub"
+)
+
+// Valid indicates whether the value is a known member of the CalculateParamsOp enum.
+func (e CalculateParamsOp) Valid() bool {
+	switch e {
+	case Add:
+		return true
+	case Div:
+		return true
+	case Mul:
+		return true
+	case Sub:
+		return true
+	default:
+		return false
+	}
+}
+
+// CalcResponse defines model for CalcResponse.
+type CalcResponse struct {
+	Result float64 `json:"result"`
+}
+
+// Error defines model for Error.
+type Error struct {
+	Error string `json:"error"`
+}
 
 // HealthcheckResponse defines model for HealthcheckResponse.
 type HealthcheckResponse struct {
@@ -26,8 +61,21 @@ type HealthcheckResponse struct {
 	Status string `json:"status"`
 }
 
+// CalculateParams defines parameters for Calculate.
+type CalculateParams struct {
+	Op1 float64           `form:"op1" json:"op1"`
+	Op2 float64           `form:"op2" json:"op2"`
+	Op  CalculateParamsOp `form:"op" json:"op"`
+}
+
+// CalculateParamsOp defines parameters for Calculate.
+type CalculateParamsOp string
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Calculate Calculate two numbers
+	// (GET /api/v1/calc)
+	Calculate(c fiber.Ctx, params CalculateParams) error
 	// Healthcheck Service health
 	// (GET /api/v1/healthcheck)
 	Healthcheck(c fiber.Ctx) error
@@ -41,6 +89,57 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc fiber.Handler
 type HandlerMiddlewareFunc func(c fiber.Ctx, next fiber.Handler) error
+
+// Calculate operation middleware
+func (siw *ServerInterfaceWrapper) Calculate(c fiber.Ctx) error {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CalculateParams
+
+	var query url.Values
+	query, err = url.ParseQuery(string(c.Request().URI().QueryString()))
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for query string: %w", err).Error())
+	}
+
+	// ------------- Required query parameter "op1" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "op1", query, &params.Op1, runtime.BindQueryParameterOptions{Type: "number", Format: "double"})
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter op1: %w", err).Error())
+	}
+
+	// ------------- Required query parameter "op2" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "op2", query, &params.Op2, runtime.BindQueryParameterOptions{Type: "number", Format: "double"})
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter op2: %w", err).Error())
+	}
+
+	// ------------- Required query parameter "op" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "op", query, &params.Op, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter op: %w", err).Error())
+	}
+
+	handler := func(c fiber.Ctx) error {
+		return siw.Handler.Calculate(c, params)
+	}
+
+	for i := len(siw.HandlerMiddlewares) - 1; i >= 0; i-- {
+		m := siw.HandlerMiddlewares[i]
+		next := handler
+		handler = func(c fiber.Ctx) error {
+			return m(c, next)
+		}
+	}
+
+	return handler(c)
+}
 
 // Healthcheck operation middleware
 func (siw *ServerInterfaceWrapper) Healthcheck(c fiber.Ctx) error {
@@ -85,6 +184,34 @@ func RegisterHandlersWithOptions(router fiber.Router, si ServerInterface, option
 
 	router.Get(options.BaseURL+"/api/v1/healthcheck", wrapper.Healthcheck)
 
+	router.Get(options.BaseURL+"/api/v1/calc", wrapper.Calculate)
+
+}
+
+type CalculateRequestObject struct {
+	Params CalculateParams
+}
+
+type CalculateResponseObject interface {
+	VisitCalculateResponse(ctx fiber.Ctx) error
+}
+
+type Calculate200JSONResponse CalcResponse
+
+func (response Calculate200JSONResponse) VisitCalculateResponse(ctx fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(200)
+
+	return ctx.JSON(&response)
+}
+
+type Calculate400JSONResponse Error
+
+func (response Calculate400JSONResponse) VisitCalculateResponse(ctx fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(400)
+
+	return ctx.JSON(&response)
 }
 
 type HealthcheckRequestObject struct {
@@ -105,6 +232,9 @@ func (response Healthcheck200JSONResponse) VisitHealthcheckResponse(ctx fiber.Ct
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// Calculate Calculate two numbers
+	// (GET /api/v1/calc)
+	Calculate(ctx context.Context, request CalculateRequestObject) (CalculateResponseObject, error)
 	// Healthcheck Service health
 	// (GET /api/v1/healthcheck)
 	Healthcheck(ctx context.Context, request HealthcheckRequestObject) (HealthcheckResponseObject, error)
@@ -121,6 +251,33 @@ func NewStrictHandler(ssi StrictServerInterface, middlewares []StrictMiddlewareF
 type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
+}
+
+// Calculate operation middleware
+func (sh *strictHandler) Calculate(ctx fiber.Ctx, params CalculateParams) error {
+	var request CalculateRequestObject
+
+	request.Params = params
+
+	handler := func(ctx fiber.Ctx, request interface{}) (interface{}, error) {
+		return sh.ssi.Calculate(ctx.Context(), request.(CalculateRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Calculate")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(CalculateResponseObject); ok {
+		if err := validResponse.VisitCalculateResponse(ctx); err != nil {
+			return err
+		}
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
 }
 
 // Healthcheck operation middleware
@@ -153,11 +310,14 @@ func (sh *strictHandler) Healthcheck(ctx fiber.Ctx) error {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"bFGxbuMwDP2VgHejYTmXTdttzVCgaMeiAyMzMVNbYiXGaBD43wvJbZ2gnUSRfCTfexdwYZDgyWsCe4Hk",
-	"OhqwhHeEvXauI/f6SEmCT5TTEoNQVKbSRH7kGPxAXsv3HQfpCSy0NFIfpBQq0LPkZNLI/gBTBUlRT+kW",
-	"giNyj7uefgKmCiK9nThSC/b5C13drH/5RoXdkZzClGHs9yGvUday5B61W/1/2EIFI8XEwYOFdd3UTT4r",
-	"CHkUBgubuqk3UIGgduVOg8JmXJtukSWnD1SIZ01QOfhtC/ZaOsiXz+qVMf+aJj8ueP3UDEV6dgVsjin4",
-	"xYYc/Y20Bwt/zOKTmavJ/OZQId1ScpFFZ3ZPFEd2tOK0WiTObek0DBjPVy0zuTxk+hgA",
+	"tFRPjxM/DP0qI/9+x6jT3eU0N0BIrBACwXHVg5txd7Lk3zrOQFX1u6NkWtrSFnFgT00a+9nv+Xk2oIOL",
+	"wZOXBN0Gkh7IYT2+Rau/UIrBJyr3yCESi6H6ypSylXJaBXYo0EEf8tISKJB1JOjAZ7ckhu1WAdNzNkw9",
+	"dA/7zMWvuLB8Ii2wVfCOOfB5Ldr/vUtIwsY/ngFPYZdw3xNaGfRA+tt1RuRHw8E78pUW/UAXbcHpaSQb",
+	"Yn1Qv/egIAlKTqcpOKKxeKLGlaZ32eqk/DmHkmb8KlQVjNQiH1GG5vXne1AwEicTPHRwM5vP5qWtEMlj",
+	"NNDB3Ww+uwMFEWWofbYYTTvetBqtLvdHqoyLGCgm+Pseujr+bFGoZjI6EuIE3cMGTCn0nInXoMCjq43G",
+	"GzhmJpxJ7ez0ly65Bnz7UsB/xCWfXRkQ9j0oSHkJCly2oKA3IyzO57ooaJO5qsq383n50cHLzlIYozW6",
+	"Stw+peAPC1dO/zOtoIP/2sNGttNrak92sZqhp6TZRJmm/ulDGfmrf1hxWsULpd5g3xTVKEk1c8rOIa+P",
+	"HdPI99BM8qcaszfccNjDq7472lV4QUUvfRIusP1KPBpNjUnNYadPae9DJnIFZPtzAA==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

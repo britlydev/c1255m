@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/britlydev/c210cc/internal/config"
+	"github.com/britlydev/c210cc/internal/service/calc"
 	"github.com/britlydev/c210cc/internal/transport/httpapi"
 	"github.com/britlydev/c210cc/internal/transport/httpapi/handler"
 	"golang.org/x/sync/errgroup"
@@ -22,6 +23,7 @@ func RunAPI(ctx context.Context, cfg config.Config) error {
 
 	h := &handler.Handler{
 		HealthHandler: handler.NewHealthHandler(cfg.Env),
+		CalcHandler:   handler.NewCalcHandler(calc.New()),
 	}
 
 	srv := httpapi.NewServer(cfg.HTTP, h, deps.logger)

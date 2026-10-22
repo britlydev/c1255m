@@ -6,4 +6,5 @@ var _ oapi.StrictServerInterface = (*Handler)(nil)
 
 type Handler struct {
 	*HealthHandler
+	*CalcHandler
 }

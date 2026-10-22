@@ -29,6 +29,10 @@ go.work.sum
 # env file
 .env
 
+# config
+configs/config.yml
+configs/config.yaml
+
 # Bind-mounted databases and work directories
 data/
 

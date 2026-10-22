@@ -1,0 +1,12 @@
+env: development # [development, staging, production]
+
+log:
+  level: debug # [debug, info, warn, error]
+  format: text # [text, json]
+
+http:
+  addr: 127.0.0.1:4000
+  read_timeout: 10s
+  write_timeout: 15s
+  idle_timeout: 60s
+  shutdown_timeout: 15s

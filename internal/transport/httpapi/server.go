@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/britlydev/c210cc/internal/config"
@@ -64,4 +65,8 @@ func (s *Server) Run(ctx context.Context) error {
 	s.logger.Info("http server stopped")
 
 	return nil
+}
+
+func (s *Server) Test(req *http.Request) (*http.Response, error) {
+	return s.app.Test(req)
 }

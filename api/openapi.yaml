@@ -1,0 +1,78 @@
+openapi: 3.0.3
+info:
+  title: Math API
+  version: 1.0.0
+paths:
+  /api/v1/healthcheck:
+    get:
+      operationId: healthcheck
+      summary: Service health
+      responses:
+        "200":
+          description: Service is available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthcheckResponse"
+  /api/v1/calc:
+    get:
+      operationId: calculate
+      summary: Calculate two numbers
+      parameters:
+        - name: op1
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+        - name: op2
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+        - name: op
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [add, sub, mul, div]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalcResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  schemas:
+    HealthcheckResponse:
+      type: object
+      required: [status, environment]
+      properties:
+        status:
+          type: string
+          example: available
+        environment:
+          type: string
+          example: development
+    CalcResponse:
+      type: object
+      required: [result]
+      properties:
+        result:
+          type: number
+          format: double
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string

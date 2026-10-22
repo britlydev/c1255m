@@ -1,0 +1,23 @@
+version: 2
+
+builds:
+  - main: ./cmd/api
+    binary: api
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, windows, darwin]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+      - -X github.com/britlydev/c1255m/internal/version.Version={{.Version}}
+      - -X github.com/britlydev/c1255m/internal/version.Commit={{.ShortCommit}}
+      - -X github.com/britlydev/c1255m/internal/version.Date={{.Date}}
+
+archives:
+  - formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+changelog:
+  use: github

@@ -12,6 +12,7 @@ import (
 
 	"github.com/britlydev/c210cc/internal/app"
 	"github.com/britlydev/c210cc/internal/config"
+	"github.com/britlydev/c210cc/internal/version"
 )
 
 func main() {
@@ -31,7 +32,17 @@ func run() error {
 		configPath = "configs/config.yaml"
 	}
 	flag.StringVar(&configPath, "config", configPath, "path to config file")
+
+	var showVersion bool
+	flag.BoolVar(&showVersion, "version", false, "print version and exit")
+
 	flag.Parse()
+
+	if showVersion {
+		v := version.Get()
+		fmt.Printf("version: %s\ncommit:  %s\ndate:    %s\ngo:      %s\n", v.Version, v.Commit, v.Date, v.GoVersion)
+		return nil
+	}
 
 	cfg, err := config.Load(configPath)
 	if err != nil {

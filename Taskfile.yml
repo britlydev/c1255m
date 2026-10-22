@@ -5,7 +5,8 @@ dotenv: ['.env']
 
 vars:
   LOCAL_BIN: './bin'
-  GOLANGCI_VERSION: latest
+  GOLANGCI_VERSION: v2.15.0
+  PKG: github.com/britlydev/c1255m/internal/version
 
 tasks:
   info:
@@ -16,7 +17,8 @@ tasks:
   install-golangci-lint:
     desc: Install golangci-lint into ./bin
     status:
-      - test -x {{.LOCAL_BIN}}/golangci-lint
+      - test -x {{.LOCAL_BIN}}/golangci-lint{{exeExt}}
+      - '{{.LOCAL_BIN}}/golangci-lint{{exeExt}} version | grep -q {{trimPrefix "v" .GOLANGCI_VERSION}}'
     cmds:
       - GOBIN="$(pwd)/bin" go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_VERSION}}
 
@@ -43,8 +45,17 @@ tasks:
 
   build-api:
     desc: Build API
+    vars:
+      VERSION:
+        sh: git describe --tags --always --dirty
+      COMMIT:
+        sh: git rev-parse --short HEAD
+      DATE:
+        sh: date -u +%Y-%m-%dT%H:%M:%SZ
+    env:
+      CGO_ENABLED: '0'
     cmds:
-      - CGO_ENABLED=0 go build -o {{.LOCAL_BIN}}/api{{exeExt}} ./cmd/api
+      - go build -ldflags "-s -w -X {{.PKG}}.Version={{.VERSION}} -X {{.PKG}}.Commit={{.COMMIT}} -X {{.PKG}}.Date={{.DATE}}" -o {{.LOCAL_BIN}}/api{{exeExt}} ./cmd/api
 
   # openapi
   get-openapi:

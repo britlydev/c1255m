@@ -18,6 +18,10 @@ archives:
     format_overrides:
       - goos: windows
         formats: [zip]
+    files:
+      - README.md
+      - .env.example
+      - configs/config.example.yaml
 
 changelog:
   use: github
